@@ -1,0 +1,18 @@
+cat > .gitignore << EOF
+# Build files
+lsm
+sst_test
+wal_test
+*.o
+
+# Database files
+*.wal
+*.dat
+MANIFEST
+
+# VS Code
+.vscode/
+
+# CMake build directories
+build/
+EOF
