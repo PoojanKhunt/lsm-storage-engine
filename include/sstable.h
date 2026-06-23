@@ -1,6 +1,7 @@
 #pragma once
 
 #include "block_index.h"
+#include "bloom_filter.h"
 #include "memtable.h"
 #include "record.h"
 
@@ -21,8 +22,11 @@ public:
 
   std::optional<Record> Get(const std::string &key);
 
+  void RebuildBloom();
+
 private:
   std::string filename;
   std::vector<BlockIndexEntry> index;
   void LoadIndex();
+  BloomFilter bloom;
 };

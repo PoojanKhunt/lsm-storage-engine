@@ -8,6 +8,7 @@ constexpr int BLOCK_RECORDS = 4;
 
 SSTable::SSTable(const std::string &filename) : filename(filename) {
   LoadIndex();
+  RebuildBloom();
 }
 
 SSTableMetaData SSTable::Flush(const MemTable &memtable) {
@@ -33,6 +34,8 @@ SSTableMetaData SSTable::Flush(const MemTable &memtable) {
     uint32_t type = static_cast<uint32_t>(record.type);
     uint32_t key_size = record.key.size();
     uint32_t value_size = record.value.size();
+
+    bloom.Add(record.key);
 
     out.write(reinterpret_cast<char *>(&seq), sizeof(seq));
     out.write(reinterpret_cast<char *>(&type), sizeof(type));
@@ -93,35 +96,21 @@ void SSTable::LoadIndex() {
               key_size + sizeof(uint32_t) + value_size;
 
     count++;
-    std::cout << "INDEX " << key << " " << offset << '\n';
+    // std::cout << "INDEX " << key << " " << offset << '\n';
   }
 }
 
 std::optional<Record> SSTable::Get(const std::string &key) {
 
-  std::ifstream in(filename, std::ios::binary);
+  if (!bloom.MightContain(key)) {
+    // std::cout << "Bloom skip: " << filename << '\n';
 
-  if (!in)
     return std::nullopt;
-
-  uint64_t start_offset = 0;
-
-  auto it = std::upper_bound(
-      index.begin(), index.end(), key,
-      [](const std::string &key, const BlockIndexEntry &entry) {
-        return key < entry.last_key;
-      });
-
-  if (it != index.begin()) {
-    --it;
-    start_offset = it->offset;
   }
 
-  in.seekg(start_offset);
+  std::ifstream in(filename, std::ios::binary);
 
-  int scanned = 0;
-
-  while (scanned < BLOCK_RECORDS) {
+  while (true) {
     Record record;
 
     uint64_t seq;
@@ -156,9 +145,42 @@ std::optional<Record> SSTable::Get(const std::string &key) {
 
     if (record.key == key)
       return record;
-
-    scanned++;
   }
 
   return std::nullopt;
+}
+
+void SSTable::RebuildBloom() {
+  std::ifstream in(filename, std::ios::binary);
+
+  if (!in)
+    return;
+
+  while (true) {
+    uint64_t seq;
+    uint32_t type;
+    uint32_t key_size;
+    uint32_t value_size;
+
+    if (!in.read(reinterpret_cast<char *>(&seq), sizeof(seq)))
+      break;
+
+    if (!in.read(reinterpret_cast<char *>(&type), sizeof(type)))
+      break;
+
+    if (!in.read(reinterpret_cast<char *>(&key_size), sizeof(key_size)))
+      break;
+
+    std::string key(key_size, '\0');
+
+    if (!in.read(key.data(), key_size))
+      break;
+
+    if (!in.read(reinterpret_cast<char *>(&value_size), sizeof(value_size)))
+      break;
+
+    in.seekg(value_size, std::ios::cur);
+
+    bloom.Add(key);
+  }
 }

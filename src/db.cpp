@@ -7,6 +7,10 @@
 DB::DB() : wal("data.wal"), manifest("MANIFEST"), next_sequence(1) {
   active_memtable = std::make_unique<MemTable>();
 
+  sstable_files = manifest.Load();
+
+  // std::cout << "Loaded " << sstable_files.size() << " SSTables\n";
+
   auto records = wal.Recover();
 
   for (const auto &record : records) {
@@ -54,6 +58,7 @@ bool DB::Delete(const std::string &key) {
 }
 
 std::optional<std::string> DB::Get(const std::string &key) {
+  // std::cout << "SSTables: " << sstable_files.size() << '\n';
   auto rec = active_memtable->Get(key);
 
   if (rec) {
@@ -72,7 +77,7 @@ std::optional<std::string> DB::Get(const std::string &key) {
 
     if (key > meta.max_key)
       continue;
-    std::cout << "Searching " << meta.filename << '\n';
+    // std::cout << "Searching " << meta.filename << '\n';
     SSTable table(meta.filename);
 
     auto disk_rec = table.Get(key);

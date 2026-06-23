@@ -4,10 +4,10 @@
 int main() {
   DB db;
 
-  auto v = db.Get("key45");
+  auto val = db.Get("key15x");
 
-  if (v)
-    std::cout << *v << '\n';
+  if (val)
+    std::cout << *val << '\n';
   else
     std::cout << "not found\n";
 }
